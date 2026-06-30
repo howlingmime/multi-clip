@@ -1,12 +1,27 @@
 import SwiftUI
 
 struct PickerView: View {
-    let items: [String]
+    let initialItems: [String]
     let onConfirm: ([String], String) -> Void
     let onCancel: () -> Void
+    let onDelete: (String) -> Void
 
+    @State private var items: [String]
     @State private var selectionOrder: [Int] = []
     @State private var separator: String = "\n"
+
+    init(
+        items: [String],
+        onConfirm: @escaping ([String], String) -> Void,
+        onCancel: @escaping () -> Void,
+        onDelete: @escaping (String) -> Void
+    ) {
+        self.initialItems = items
+        self.onConfirm = onConfirm
+        self.onCancel = onCancel
+        self.onDelete = onDelete
+        _items = State(initialValue: items)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -24,7 +39,7 @@ struct PickerView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Pick clips to paste")
                     .font(.headline)
-                Text("Click in the order you want them pasted. Enter to paste, Esc to cancel.")
+                Text("Click to select. × deletes. Enter to paste, Esc to cancel.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -42,10 +57,10 @@ struct PickerView: View {
                 ForEach(items.indices, id: \.self) { idx in
                     ClipRow(
                         text: items[idx],
-                        order: selectionOrder.firstIndex(of: idx).map { $0 + 1 }
+                        order: selectionOrder.firstIndex(of: idx).map { $0 + 1 },
+                        onTap: { toggle(idx) },
+                        onDelete: { delete(idx) }
                     )
-                    .contentShape(Rectangle())
-                    .onTapGesture { toggle(idx) }
                 }
             }
             .padding(.horizontal, 10)
@@ -88,6 +103,14 @@ struct PickerView: View {
         }
     }
 
+    private func delete(_ idx: Int) {
+        guard items.indices.contains(idx) else { return }
+        let removed = items.remove(at: idx)
+        selectionOrder.removeAll { $0 == idx }
+        selectionOrder = selectionOrder.map { $0 > idx ? $0 - 1 : $0 }
+        onDelete(removed)
+    }
+
     private func confirm() {
         let chosen = selectionOrder.map { items[$0] }
         onConfirm(chosen, separator)
@@ -97,6 +120,10 @@ struct PickerView: View {
 private struct ClipRow: View {
     let text: String
     let order: Int?
+    let onTap: () -> Void
+    let onDelete: () -> Void
+
+    @State private var hovering = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -106,6 +133,7 @@ private struct ClipRow: View {
                 .lineLimit(4)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            deleteButton
         }
         .padding(10)
         .background(
@@ -116,6 +144,9 @@ private struct ClipRow: View {
             RoundedRectangle(cornerRadius: 8)
                 .strokeBorder(order == nil ? Color.clear : Color.accentColor, lineWidth: 1)
         )
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onTap)
+        .onHover { hovering = $0 }
     }
 
     private var badge: some View {
@@ -132,6 +163,17 @@ private struct ClipRow: View {
                     .font(.system(size: 12, weight: .semibold))
             }
         }
+    }
+
+    private var deleteButton: some View {
+        Button(action: onDelete) {
+            Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 16))
+                .foregroundStyle(.secondary)
+                .opacity(hovering ? 1 : 0.35)
+        }
+        .buttonStyle(.plain)
+        .help("Delete from history")
     }
 
     private var preview: String {

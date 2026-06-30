@@ -61,6 +61,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             },
             onCancel: { [weak self] in
                 self?.closePicker()
+            },
+            onDelete: { [weak self] value in
+                self?.clipboardMonitor.delete(value)
             }
         )
 
