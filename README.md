@@ -39,4 +39,5 @@ into `MultiClip.app/Contents/MacOS/` with a minimal `Info.plist` that sets
 6. The picker closes, the previous app regains focus, and the joined text is
    pasted at the cursor.
 
-Esc cancels. Menubar icon has **Clear History** and **Quit**.
+Esc cancels. Menubar icon has **Save History…** (exports all clips to a
+plain-text file, separated by blank lines), **Clear History**, and **Quit**.

@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import ApplicationServices
+import UniformTypeIdentifiers
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
@@ -25,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let menu = NSMenu()
         menu.addItem(withTitle: "Show Picker  ⇧⌘P", action: #selector(showPickerFromMenu), keyEquivalent: "")
+        menu.addItem(withTitle: "Save History…", action: #selector(saveHistory), keyEquivalent: "")
         menu.addItem(withTitle: "Clear History", action: #selector(clearHistory), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit MultiClip", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
@@ -38,6 +40,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showPickerFromMenu() { showPicker() }
     @objc private func clearHistory() { clipboardMonitor.clear() }
+
+    @objc private func saveHistory() {
+        let items = clipboardMonitor.items
+        guard !items.isEmpty else {
+            NSSound.beep()
+            return
+        }
+
+        let panel = NSSavePanel()
+        panel.title = "Save Clipboard History"
+        panel.nameFieldStringValue = "MultiClip-history.txt"
+        panel.allowedContentTypes = [.plainText]
+        panel.canCreateDirectories = true
+
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        let text = items.joined(separator: "\n\n")
+        do {
+            try text.write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "Couldn't save history"
+            alert.informativeText = error.localizedDescription
+            alert.alertStyle = .warning
+            alert.runModal()
+        }
+    }
 
     private func showPicker() {
         if let existing = pickerWindow {
