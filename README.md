@@ -12,9 +12,25 @@ The binary lands at `.build/release/MultiClip`.
 
 ## Run
 
+Foreground (blocks the terminal, Ctrl-C to quit):
+
     .build/release/MultiClip
 
+Background (detach from the terminal, keep running after it closes):
+
+    nohup .build/release/MultiClip >/dev/null 2>&1 &
+
 It runs as a menubar-only app (📋 icon, no Dock tile).
+
+Check whether it's running:
+
+    pgrep -lf MultiClip
+
+Stop it:
+
+    pkill -f MultiClip
+
+…or use **Quit** from the menubar icon.
 
 ### Accessibility permission
 
