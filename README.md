@@ -4,46 +4,70 @@ Native macOS menubar app. Captures every ⌘C into a rolling history (last 50,
 deduped). Press ⇧⌘P to open a picker, click clips in the order you want them
 pasted, hit Enter — joined text is pasted into the destination app.
 
-## Build
+## Install
 
-    swift build -c release
+    ./scripts/package.sh            # builds + bundles into ~/Applications/MultiClip.app
+    ./scripts/launchagent.sh install  # start it now, and at every login
 
-The binary lands at `.build/release/MultiClip`.
+Then grant Accessibility (see below). That's the whole setup.
 
-## Run
+`package.sh` takes an optional destination (`./scripts/package.sh /Applications`).
+Rebuilding after a code change is `package.sh` again followed by
+`launchagent.sh install`, which restarts the running copy.
 
-Foreground (blocks the terminal, Ctrl-C to quit):
+Two environment overrides, both optional: `MULTICLIP_BUNDLE_ID` (defaults to
+`dev.howlingmime.MultiClip`) and `CODESIGN_IDENTITY`, if you have several
+certificates and want a specific one.
 
-    .build/release/MultiClip
+To back out completely:
 
-Background (detach from the terminal, keep running after it closes):
-
-    nohup .build/release/MultiClip >/dev/null 2>&1 &
+    ./scripts/launchagent.sh uninstall
+    rm -rf ~/Applications/MultiClip.app
 
 It runs as a menubar-only app (📋 icon, no Dock tile).
 
-Check whether it's running:
-
-    pgrep -lf MultiClip
-
-Stop it:
-
-    pkill -f MultiClip
-
-…or use **Quit** from the menubar icon.
-
 ### Accessibility permission
 
-Synthesizing the ⌘V keystroke requires Accessibility access. On first launch
-macOS will prompt; if it doesn't, open **System Settings → Privacy & Security →
-Accessibility**, click `+`, add the `MultiClip` binary, and toggle it on.
+Synthesizing the ⌘V keystroke requires Accessibility access. Open **System
+Settings → Privacy & Security → Accessibility** and toggle **MultiClip** on.
+Everything else — capturing clips, the picker, saving history — works without
+it; only the final paste keystroke needs it.
 
-Whichever process runs the binary needs the permission — if you launch from
-Terminal/iTerm, Terminal/iTerm itself needs Accessibility access.
+This is why the app is bundled and code-signed rather than run as a bare
+binary. macOS grants Accessibility to a *code identity*, not a file path:
 
-For a friendlier setup, wrap the binary in a `.app` bundle (drop the executable
-into `MultiClip.app/Contents/MacOS/` with a minimal `Info.plist` that sets
-`LSUIElement = true`) and grant the bundle Accessibility access directly.
+- A bare `.build/release/MultiClip` run from a terminal has no identity of its
+  own, so the permission has to be granted to Terminal/iTerm — which then lets
+  *anything* you run from a shell synthesize keystrokes.
+- An ad-hoc signature changes hash on every rebuild, so macOS revokes the grant
+  each time you rebuild.
+
+`package.sh` signs with a stable Developer identity when one is installed
+(`security find-identity -v -p codesigning`), so you grant it once and rebuilds
+keep working. Without an identity it falls back to ad-hoc and warns.
+
+## Running as a service
+
+The LaunchAgent (`~/Library/LaunchAgents/dev.howlingmime.MultiClip.plist`) is the
+recommended way to run it: a clipboard history is only useful if it was running
+*before* you copied something, so anything short of always-on loses clips.
+
+    ./scripts/launchagent.sh status      # is it running?
+    ./scripts/launchagent.sh uninstall   # stop and remove
+
+**Quit** from the menubar icon stays quit until the next login — the agent uses
+`KeepAlive: SuccessfulExit = false`, so it relaunches after a crash but respects
+a deliberate quit. It also appears under **System Settings → General → Login
+Items → Allow in the Background** if you want to toggle it from the UI.
+
+Logs go to `~/Library/Logs/MultiClip.log`.
+
+## Hacking on it
+
+`swift build -c release` on its own still works and drops a binary at
+`.build/release/MultiClip`, which is fine for a quick compile check. To actually
+exercise the paste path you need the signed bundle, so use `package.sh` — a bare
+binary can't hold its own Accessibility grant (see above).
 
 ## Use
 
