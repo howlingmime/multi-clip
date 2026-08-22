@@ -7,7 +7,8 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "MultiClip",
-            path: "Sources/MultiClip"
+            path: "Sources/MultiClip",
+            linkerSettings: [.linkedLibrary("sqlite3")]
         )
     ]
 )
