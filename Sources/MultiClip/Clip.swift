@@ -73,6 +73,20 @@ struct Clip: Identifiable, Codable, Hashable {
         }
     }
 
+    /// Everything a search query may legitimately hit: the snippet name, the text preview,
+    /// each file path, and the type badge (so "img" or "file" narrows by kind). Long clips are
+    /// truncated — matches far past this point are not useful in a preview-sized row anyway.
+    var searchHaystack: String {
+        var parts: [String] = []
+        if let name, !name.isEmpty { parts.append(name) }
+        parts.append(String(text.prefix(4_000)))
+        if let fileURLs, !fileURLs.isEmpty {
+            parts.append(fileURLs.map { URL(string: $0)?.path ?? $0 }.joined(separator: " "))
+        }
+        parts.append(kind.badge)
+        return parts.joined(separator: " ")
+    }
+
     var displayTitle: String {
         if let name, !name.isEmpty { return name }
         return kind.badge

@@ -83,11 +83,7 @@ struct PickerView: View {
         guard !trimmed.isEmpty else {
             return scoped.sorted { ($0.pinned ? 1 : 0, $0.capturedAt) > ($1.pinned ? 1 : 0, $1.capturedAt) }
         }
-        let tokens = Self.tokenize(trimmed)
-        return scoped.filter { clip in
-            let hay = ((clip.name ?? "") + " " + clip.text).lowercased()
-            return tokens.allSatisfy { hay.contains($0) }
-        }
+        return ClipSearch.rank(scoped, query: trimmed)
     }
 
     private var chosenClips: [Clip] {
@@ -143,7 +139,7 @@ struct PickerView: View {
             }
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Search clips…", text: $query)
+                TextField("Search clips — fuzzy, by word or path…", text: $query)
                     .textFieldStyle(.roundedBorder)
                     .focused($searchFocused)
                 if !query.isEmpty {
@@ -298,10 +294,6 @@ struct PickerView: View {
 
     private func confirm() {
         onConfirm(chosenClips, separator)
-    }
-
-    private static func tokenize(_ q: String) -> [String] {
-        q.lowercased().split(whereSeparator: { $0.isWhitespace || $0 == "/" || $0 == "." || $0 == "\\" || $0 == "_" || $0 == "-" }).map(String.init)
     }
 }
 

@@ -16,7 +16,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let keychainAccount = "primary"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        clipboardMonitor = ClipboardMonitor(store: initialStore())
+        let store = initialStore()
+        clipboardMonitor = ClipboardMonitor(store: store, historyCap: currentHistoryCap())
         clipboardMonitor.onChange = { [weak self] in
             self?.pickerModel?.clips = self?.clipboardMonitor.clips ?? []
         }
@@ -30,6 +31,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.showPicker(filter: .snippets)
         }
         promptForAccessibilityIfNeeded()
+    }
+
+    /// Encrypted persistence is the "keep everything" mode, so it lifts the rolling cap.
+    private func currentHistoryCap() -> Int {
+        UserDefaults.standard.bool(forKey: encryptedKey) ? HistoryCap.persistent : HistoryCap.rolling
     }
 
     private func initialStore() -> ClipStore {
@@ -111,7 +117,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if currentlyOn {
             let alert = NSAlert()
             alert.messageText = "Disable encrypted persistent history?"
-            alert.informativeText = "Your encrypted database will be deleted. Non-encrypted history storage will resume."
+            alert.informativeText = "Your encrypted database will be deleted. Non-encrypted history storage resumes, and history is trimmed back to the most recent \(HistoryCap.rolling) unpinned clips. Pinned snippets are kept."
             alert.addButton(withTitle: "Disable")
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else { return }
@@ -119,13 +125,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             try? FileManager.default.removeItem(at: StorePaths.sqliteURL)
             UserDefaults.standard.set(false, forKey: encryptedKey)
             clipboardMonitor.swapStore(FileClipStore(), migrateExisting: true)
+            clipboardMonitor.setHistoryCap(HistoryCap.rolling)
         } else {
             guard let passphrase = promptForPassphrase() else { return }
             do {
                 let sqlite = try SQLiteClipStore(passphrase: passphrase)
                 Keychain.setPassphrase(passphrase, account: keychainAccount)
                 UserDefaults.standard.set(true, forKey: encryptedKey)
+                // Raise the cap before migrating so nothing is evicted on the way across.
+                clipboardMonitor.setHistoryCap(HistoryCap.persistent)
                 clipboardMonitor.swapStore(sqlite, migrateExisting: true)
+                // The JSON history is plaintext on disk; leaving it behind would defeat
+                // the point of switching to an encrypted store.
+                try? FileManager.default.removeItem(at: StorePaths.jsonHistoryURL)
             } catch {
                 let a = NSAlert(); a.messageText = "Could not initialize encrypted store"
                 a.informativeText = error.localizedDescription; a.alertStyle = .warning; a.runModal()
@@ -138,7 +150,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func promptForPassphrase() -> String? {
         let alert = NSAlert()
         alert.messageText = "Set encryption passphrase"
-        alert.informativeText = "Clips will be encrypted at rest using AES-GCM with a key derived from this passphrase. The passphrase is stored in your macOS Keychain."
+        alert.informativeText = "Clips will be encrypted at rest using AES-GCM with a key derived from this passphrase, and history survives reboots and grows to \(HistoryCap.persistent) clips instead of \(HistoryCap.rolling). The passphrase is stored in your macOS Keychain, and the existing plaintext history file is deleted."
         alert.addButton(withTitle: "Enable")
         alert.addButton(withTitle: "Cancel")
         let field = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))

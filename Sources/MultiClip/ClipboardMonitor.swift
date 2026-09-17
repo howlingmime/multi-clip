@@ -1,17 +1,34 @@
 import AppKit
 
+/// How many unpinned clips the history keeps. The rolling in-memory/JSON history stays
+/// small; the opt-in encrypted SQLite store is meant to accumulate, so it gets a far
+/// larger ceiling (still bounded, to keep picker rendering and load times sane).
+enum HistoryCap {
+    static let rolling = 50
+    static let persistent = 5_000
+}
+
 final class ClipboardMonitor {
     private(set) var clips: [Clip] = []
     private var lastChangeCount: Int = 0
     private var timer: Timer?
-    private let historyCap: Int
+    private(set) var historyCap: Int
     private var store: ClipStore
 
     var onChange: (() -> Void)?
 
-    init(store: ClipStore, historyCap: Int = 50) {
+    init(store: ClipStore, historyCap: Int = HistoryCap.rolling) {
         self.store = store
         self.historyCap = historyCap
+    }
+
+    /// Change the eviction ceiling. Lowering it trims (and deletes) the oldest unpinned
+    /// clips immediately; raising it simply lets history keep growing.
+    func setHistoryCap(_ cap: Int) {
+        guard cap != historyCap else { return }
+        historyCap = cap
+        evict()
+        onChange?()
     }
 
     func start() {

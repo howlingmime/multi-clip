@@ -4,6 +4,33 @@ Native macOS menubar app. Captures every ⌘C into a rolling history (last 50,
 deduped). Press ⇧⌘P to open a picker, click clips in the order you want them
 pasted, hit Enter — joined text is pasted into the destination app.
 
+## Features
+
+**Rich content types.** RTF, HTML, images, file URLs, and colors are captured in
+their original pasteboard flavor, not flattened to text. Each row carries a type
+badge, the preview pane renders images, swatches, and file icons, and pasting a
+single clip restores the original flavor. Selecting several clips joins their
+text with the chosen separator.
+
+**Fuzzy search.** The picker's search field filters live. Queries are tokenized
+on whitespace and path punctuation, so `sources/picker` searches for `sources`
+and `picker` independently; every token must match, and results are ranked by
+match quality (exact word → word prefix → substring → fuzzy subsequence). File
+clips match on any single path component, snippet names are weighted highest,
+and the type badge is searchable (`img`, `file`, `rtf`).
+
+**Encrypted persistent history.** Off by default. **Enable Encrypted Persistent
+History…** in the menubar asks for a passphrase, then moves history into a
+SQLite database where each clip is encrypted with AES-GCM under a key derived
+from it. The passphrase lives in your Keychain, the plaintext `history.json` is
+deleted on switchover, history survives reboots, and the cap rises from 50 to
+5000 clips. Disabling deletes the database and trims back to the most recent 50.
+
+**Named snippets.** Right-click any clip → **Pin as Snippet…** to give it a name.
+Snippets never expire — clearing history and eviction both skip them — and
+⇧⌘S opens the picker filtered to just snippets. Right-click a snippet to rename
+or unpin it.
+
 ## Build
 
     swift build -c release
@@ -56,4 +83,8 @@ into `MultiClip.app/Contents/MacOS/` with a minimal `Info.plist` that sets
    pasted at the cursor.
 
 Esc cancels. Menubar icon has **Save History…** (exports all clips to a
-plain-text file, separated by blank lines), **Clear History**, and **Quit**.
+plain-text file, separated by blank lines), **Clear History** (keeps pinned
+snippets), **Enable/Disable Encrypted Persistent History**, and **Quit**.
+
+Storage lives in `~/Library/Application Support/MultiClip/` — `history.json`
+by default, or `history.sqlite` when encrypted persistence is on.
